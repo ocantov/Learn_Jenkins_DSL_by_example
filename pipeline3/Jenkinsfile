@@ -1,0 +1,69 @@
+pipeline {
+        agent {
+        kubernetes {
+        label 'jenkins-agent'
+        containerTemplate {
+            name 'alpine'
+            image 'alpine'
+            ttyEnabled true
+            command 'cat'
+        }
+        }
+    }
+    stages {
+        stage('Build') {
+               steps {
+                sh "./progress.sh"   
+                stash includes: '**/*', name: 'workspace'
+            }
+        }
+
+        stage('Run Tests') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                     withEnv(["service=NewTaxi"]) {                        
+                        sh 'echo Unit Tests for $service'
+                        sh 'echo Success.......'
+                    }
+                    }
+                    post {
+                        always {
+                            sh 'echo post unit tests results'
+                        }
+                    }
+                }
+                stage('Integration Tests') {
+                    steps {
+                     withEnv(["service=NewTaxi"]) {                        
+                        sh 'echo Integration Tests for $service'
+                        sh 'echo Success.......'
+                     }
+                    }
+                    post {
+                        always {
+                             sh 'echo post integration tests results'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage ('Deliver Artifact'){
+             when {
+                branch "master"
+                }
+             steps {
+                unstash 'workspace'
+                sh "./progress.sh"
+                script {
+                    def packages = ['Docker', '.ZIP']
+                    for (int i = 0; i < packages.size(); ++i) {
+                        echo "Uploading the ${packages[i]} to the artifact repository"
+                    }
+                }
+            }
+        }
+
+    }
+}
